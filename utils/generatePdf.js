@@ -84,11 +84,20 @@ function generatePdf(session, filename = "budget-summary.pdf") {
 
     // === Top 3 Expenses ===
     y = drawSectionHeader("Top 3 Expenses", y, "#2196f3");
+
     session.summary?.topExpenses?.forEach((item) => {
-      y = checkPageSpace(doc, y, "Top 3 Expenses");
+      // Add page if we're close to bottom
+      if (y > 720) {
+        doc.addPage();
+        y = 50; // reset margin
+        y = drawSectionHeader("Top 3 Expenses (cont.)", y, "#2196f3");
+      }
+
       doc.font("Helvetica").text(`- ${item}`, 60, y);
       y += 16;
     });
+
+    y += 20;
 
     // === AI Insight ===
     y = drawSectionHeader("AI Insight", y, "#9c27b0");
@@ -118,13 +127,13 @@ function formatCurrency(amount, currency) {
   return `${symbol}${Number(amount).toLocaleString()}`;
 }
 
-const checkPageSpace = (doc, y, label) => {
-  if (y > 720) {
-    doc.addPage();
-    y = 50;
-    y = drawSectionHeader(label + " (cont.)", y, "#2196f3");
-  }
-  return y;
-};
+// const checkPageSpace = (doc, y, label) => {
+//   if (y > 720) {
+//     doc.addPage();
+//     y = 50;
+//     y = drawSectionHeader(label + " (cont.)", y, "#2196f3");
+//   }
+//   return y;
+// };
 
 module.exports = generatePdf;
