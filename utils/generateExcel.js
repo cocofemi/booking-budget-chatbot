@@ -10,6 +10,7 @@ async function generateExcel(session) {
     { header: "Item", key: "label", width: 30 },
     { header: "Amount", key: "value", width: 20 },
   ];
+  sheet.getColumn("value").alignment = { horizontal: "right" };
 
   // Add session details
   sheet.addRow({
