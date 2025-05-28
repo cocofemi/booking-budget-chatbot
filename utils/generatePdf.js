@@ -46,6 +46,30 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     y = addField("Currency", session.currency, y);
     y += 20;
 
+    // === Ticket Info Section ===
+    y = drawSectionHeader("Ticket Information", y, "#8bc34a");
+    y = addField("Tickets Tiers", session.ticketCount || 0, y);
+    session.tickets?.forEach((ticket) => {
+      doc
+        .font("Helvetica")
+        .text(
+          `- ${ticket.name} (${ticket.quantity} @ ${formatCurrency(
+            ticket.price,
+            session.currency
+          )})`,
+          60,
+          y
+        );
+      y += 16;
+    });
+    y += 20;
+    // === Currency Section ===
+    y = drawSectionHeader("Currency", y, "#8bc34a");
+    doc
+      .font("Helvetica")
+      .text(`The currency used for this event is: ${session.currency}`, 60, y);
+    y += 20;
+
     // === Summary Section ===
     y = drawSectionHeader("Budget Summary", y, "#e91e63");
     y = addField(
@@ -68,6 +92,11 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     // === Expense List ===
     y = drawSectionHeader("All Expenses", y, "#ffc107");
     session.expenses?.forEach((expense) => {
+      if (y > 720) {
+        doc.addPage();
+        y = 50; // reset margin
+        y = drawSectionHeader("AllExpenses (cont.)", y, "#ffc107");
+      }
       doc
         .font("Helvetica")
         .text(
@@ -84,7 +113,6 @@ function generatePdf(session, filename = "budget-summary.pdf") {
 
     // === Top 3 Expenses ===
     y = drawSectionHeader("Top 3 Expenses", y, "#2196f3");
-
     session.summary?.topExpenses?.forEach((item) => {
       // Add page if we're close to bottom
       if (y > 720) {
@@ -127,13 +155,13 @@ function formatCurrency(amount, currency) {
   return `${symbol}${Number(amount).toLocaleString()}`;
 }
 
-// const checkPageSpace = (doc, y, label) => {
-//   if (y > 720) {
-//     doc.addPage();
-//     y = 50;
-//     y = drawSectionHeader(label + " (cont.)", y, "#2196f3");
-//   }
-//   return y;
-// };
+const checkPageSpace = (doc, y, label) => {
+  if (y > 720) {
+    doc.addPage();
+    y = 50;
+    y = drawSectionHeader(label + " (cont.)", y, "#2196f3");
+  }
+  return y;
+};
 
 module.exports = generatePdf;

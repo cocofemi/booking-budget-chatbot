@@ -27,6 +27,7 @@ const SessionSchema = new mongoose.Schema({
   expenses: [ExpenseSchema],
   currentTicketIndex: { type: Number, default: 0 },
   currentExpenseIndex: { type: Number, default: 0 },
+  formatChoice: { type: String, enum: ["pdf", "excel"], default: null },
   summary: {
     grossRevenue: Number,
     totalExpenses: Number,

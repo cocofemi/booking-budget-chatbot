@@ -14,6 +14,8 @@ const validate = require("../utils/validation");
 const generatePdf = require("../utils/generatePdf");
 const fs = require("fs");
 const FormData = require("form-data");
+const generateExcel = require("../utils/generateExcel");
+const sendDocument = require("../utils/sendDocument");
 
 const STATES = [
   "welcome_message",
@@ -51,14 +53,31 @@ const startSession = async (req, res) => {
   const session = await findOrCreateSession(phoneNumber);
   const currentStep = session.currentStep;
 
+  let hasResponded = false;
+
+  const safeReply = async (msg) => {
+    if (!hasResponded) {
+      await sendReply(phoneNumber, msg);
+      res.sendStatus(200);
+      hasResponded = true;
+    }
+  };
+
   let reply = "";
   const lowerText = text.trim().toLowerCase();
 
   if (lowerText === "restart") {
+    // await safeReply(
+    //   `✅ Give me one second while I generate your budget summary PDF...`
+    // );
+    await safeReply(
+      `🔁 Starting over...\n\nWho are you booking? (Artist Name)`
+    );
+
+    await updateSessionStep(phoneNumber, "ask_artist");
     await Session.findOneAndUpdate(
       { phoneNumber },
       {
-        currentStep: "ask_name",
         tickets: [],
         expenses: [],
         summary: {},
@@ -68,139 +87,137 @@ const startSession = async (req, res) => {
       }
     );
 
-    reply = `🔁 Starting over... What’s your name?`;
-    return await sendReply(phoneNumber, reply, res);
+    // await safeReply(`Who are you booking? (Artist Name)`);
+    return;
   }
 
-  if (lowerText === "pdf") {
+  if (["pdf", "excel"].includes(lowerText)) {
     if (!session.completed || !session.summary) {
-      reply = `📄 You can only request a PDF after completing the budget session. Type *restart* to begin.`;
+      safeReply(
+        `📄 You can only request a PDF after completing the budget session. Type *restart* to begin.`
+      );
       return await sendReply(phoneNumber, reply, res);
     }
 
+    await updateSessionField(phoneNumber, "formatChoice", lowerText);
+
     try {
-      reply = `✅ Give me one second while I generate your budget summary PDF...`;
-      await sendReply(phoneNumber, reply, res);
-      const pdfPath = await generatePdf(session);
-      const form = new FormData();
-      form.append("file", fs.createReadStream(pdfPath));
-      form.append("type", "application/pdf");
-      form.append("messaging_product", "whatsapp");
+      //   await safeReply(
+      //     `✅ Give me one second while I generate your budget summary PDF...`
+      //   );
+      //   reply = `✅ Give me one second while I generate your budget summary PDF...`;
+      //   await sendReply(phoneNumber, reply, res);
+      if (lowerText === "pdf") {
+        await safeReply("✅ Generating your PDF...");
+        const pdfPath = await generatePdf(session);
+        await sendDocument(pdfPath, phoneNumber, "event-budget-summary.pdf");
 
-      const mediaRes = await axios.post(
-        `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/media`,
-        form,
-        {
-          headers: {
-            ...form.getHeaders(),
-            Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-          },
-        }
-      );
+        await sendReply(
+          phoneNumber,
+          `✅ Done! Want this in Excel instead? Type *excel* to get a spreadsheet.\nOr type *restart* to begin a new session.`
+        );
+      } else {
+        await safeReply("✅ Generating your Excel sheet...");
+        const excelPath = await generateExcel(session); // You’ll build this
+        await sendDocument(excelPath, phoneNumber, "event-budget-summary.xlsx");
 
-      const mediaId = mediaRes.data.id;
-      await axios.post(
-        `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/messages`,
-        {
-          messaging_product: "whatsapp",
-          to: phoneNumber,
-          type: "document",
-          document: {
-            id: mediaId,
-            caption: "📄 Your budget summary PDF",
-            filename: "event-budget-summary.pdf",
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      reply = `✅ This session is complete. Type *restart* to begin a new budgeting session.`;
-      return await sendReply(phoneNumber, reply, res);
+        await sendReply(
+          phoneNumber,
+          `✅ Done! Want a PDF version instead? Type *pdf* to get one.\nOr type *restart* to start fresh.`
+        );
+      }
     } catch (error) {
       console.error("Error generating PDF:", error);
-      reply = `❌ Something went wrong while generating your PDF. Please try again.`;
-      return sendReply(phoneNumber, reply, res);
+      return await safeReply(
+        `❌ Something went wrong while generating your PDF. Please try again.`
+      );
     }
   }
 
   if (session.completed) {
     const restartMsg = `✅ This session is complete. Type *restart* to begin a new budgeting session.`;
-    return sendReply(phoneNumber, restartMsg, res);
+    return await safeReply(phoneNumber, restartMsg, res);
   }
 
   switch (currentStep) {
     case "welcome_message":
       await updateSessionField(phoneNumber, "name", text);
       await updateSessionStep(phoneNumber, "ask_name");
-      reply = `👋 Hi there! I’m a Budget booking assistant, your event budgeting assistant. Let’s get started with your event budget planning.\n\nWhat’s your name?`;
+      await safeReply(
+        `👋 Hi there! I’m a Budget booking assistant, your event budgeting assistant. Let’s get started with your event budget planning.\n\nWhat’s your name?`
+      );
       break;
 
     case "ask_name":
       await updateSessionField(phoneNumber, "name", text);
       await updateSessionStep(phoneNumber, "ask_email");
-      reply = `Thanks ${text}! What’s your email address?`;
+      await safeReply(`Thanks ${text}! What’s your email address?`);
       break;
 
     case "ask_email":
       if (!validate.isValidEmail(text)) {
-        reply = `❌ Please enter a valid email address.`;
+        await safeReply(`❌ Please enter a valid email address.`);
         break;
       }
       await updateSessionField(phoneNumber, "email", text);
       await updateSessionStep(phoneNumber, "ask_artist");
-      reply = `Great! Who are you booking? (Artist Name)`;
+      await safeReply(`Great! Who are you booking? (Artist Name)`);
       break;
 
     case "ask_artist":
       await updateSessionField(phoneNumber, "artist", text);
       await updateSessionStep(phoneNumber, "ask_location");
-      reply = `Awesome. What city will the event take place?`;
+      await safeReply(`Awesome. What city will the event take place?`);
       break;
 
     case "ask_location":
       await updateSessionField(phoneNumber, "location", text);
       await updateSessionStep(phoneNumber, "ask_venue");
-      reply = `What’s the name of the venue?`;
+      await safeReply(`What’s the name of the venue?`);
       break;
 
     case "ask_venue":
       await updateSessionField(phoneNumber, "venue", text);
       await updateSessionStep(phoneNumber, "ask_date");
-      reply = `What’s the date of the event? (e.g. 2025-07-13)`;
+      await safeReply(`What’s the date of the event? (e.g. 2025-07-13)`);
       break;
 
     case "ask_date":
       await updateSessionField(phoneNumber, "date", text);
       await updateSessionStep(phoneNumber, "ask_capacity");
-      reply = `What’s the expected capacity of the venue (e.g. 2000, 50000)?`;
+      await safeReply(
+        `What’s the expected capacity of the venue (e.g. 2000, 50000)?`
+      );
       break;
 
     case "ask_capacity":
       await updateSessionField(phoneNumber, "capacity", parseInt(text));
       await updateSessionStep(phoneNumber, "ask_currency");
-      reply = `What currency are you budgeting in? (e.g. NGN, USD, GBP)`;
+      await safeReply(
+        `What currency are you budgeting in? (e.g. NGN, USD, GBP)`
+      );
       break;
 
     case "ask_currency":
       await updateSessionField(phoneNumber, "currency", text.toUpperCase());
       await updateSessionStep(phoneNumber, "ask_ticket_count");
-      reply = `How many ticket tiers will you sell (e.g. 2, 3, 1) ?`;
+      await safeReply(`How many ticket tiers will you sell (e.g. 2, 3, 1) ?`);
       break;
 
     // ask_ticket_count: set the total number of ticket tiers
     case "ask_ticket_count": {
       if (!validate.isValidPositiveInteger(text)) {
-        reply = `❌ Please enter a valid number of ticket tiers. For example: 1, 2, 3.`;
+        await safeReply(
+          `❌ Please enter a valid number of ticket tiers. For example: 1, 2, 3.`
+        );
         break;
       }
       await updateSessionField(phoneNumber, "ticketCount", parseInt(text));
       await updateSessionField(phoneNumber, "currentTicketIndex", 0);
       await updateSessionStep(phoneNumber, "ask_ticket_details");
-      reply = `Let’s start entering ticket details. What’s the name of ticket tier #1?`;
+      await safeReply(
+        `Let’s start entering ticket details. What’s the name of ticket tier #1?`
+      );
       break;
     }
 
@@ -210,14 +227,16 @@ const startSession = async (req, res) => {
       await updateSessionField(phoneNumber, `tickets.${index}.name`, text);
       await updateSessionStep(phoneNumber, "ask_ticket_price");
 
-      reply = `What’s the price for *${text}* (e.g. 50, 100)?`;
+      await safeReply(`What’s the price for *${text}* (e.g. 50, 100)?`);
       break;
     }
 
     // ask_ticket_price: get the price for current ticket tier
     case "ask_ticket_price": {
       if (!validate.isValidPositiveInteger(text)) {
-        reply = `❌ Please enter a valid number of ticket price. e.g. 50, 100, 200.`;
+        await safeReply(
+          `❌ Please enter a valid number of ticket price. e.g. 50, 100, 200.`
+        );
         break;
       }
       const index = session.currentTicketIndex;
@@ -225,14 +244,18 @@ const startSession = async (req, res) => {
 
       const price = parseFloat(text);
       if (isNaN(price)) {
-        reply = `❌ Please enter a valid price for ${ticketName} (e.g. 100)`;
+        await safeReply(
+          `❌ Please enter a valid price for ${ticketName} (e.g. 100)`
+        );
         break;
       }
 
       await updateSessionField(phoneNumber, `tickets.${index}.price`, price);
       await updateSessionStep(phoneNumber, "ask_ticket_quantity");
 
-      reply = `How many *${ticketName}* tickets are you selling (e.g. 100, 500, 3000)?`;
+      await safeReply(
+        `How many *${ticketName}* tickets are you selling (e.g. 100, 500, 3000)?`
+      );
       break;
     }
 
@@ -242,9 +265,11 @@ const startSession = async (req, res) => {
       const ticket = session.tickets?.[index];
       const quantity = parseInt(text);
       if (isNaN(quantity)) {
-        reply = `❌ Please enter a valid number of tickets for ${
-          ticket?.name || "this tier"
-        } (e.g. 200)`;
+        await safeReply(
+          `❌ Please enter a valid number of tickets for ${
+            ticket?.name || "this tier"
+          } (e.g. 200)`
+        );
         break;
       }
 
@@ -265,11 +290,13 @@ const startSession = async (req, res) => {
       if (nextIndex < ticketCount) {
         await updateSessionField(phoneNumber, "currentTicketIndex", nextIndex);
         await updateSessionStep(phoneNumber, "ask_ticket_details");
-        reply = `What’s the name of ticket tier #${nextIndex + 1}?`;
+        await safeReply(`What’s the name of ticket tier #${nextIndex + 1}?`);
       } else {
         console.log("✅ All tickets complete. Moving to expenses.");
         await updateSessionStep(phoneNumber, "ask_expenses");
-        reply = `✅ Great! Now let’s go through expenses.\nWhat’s your cost for: ${expenseLabels[0]}?`;
+        await safeReply(
+          `✅ Great! Now let’s go through expenses.\nWhat’s your cost for: ${expenseLabels[0]}?`
+        );
       }
 
       break;
@@ -280,7 +307,9 @@ const startSession = async (req, res) => {
       const label = expenseLabels[index];
 
       if (isNaN(text) || !validate.isValidFloat(text)) {
-        reply = `❌ Please enter a valid amount for ${label} (e.g. 1000, 5000).`;
+        await safeReply(
+          `❌ Please enter a valid amount for ${label} (e.g. 1000, 5000).`
+        );
         break;
       }
 
@@ -288,10 +317,12 @@ const startSession = async (req, res) => {
 
       if (index + 1 < expenseLabels.length) {
         await updateSessionField(phoneNumber, "currentExpenseIndex", index + 1);
-        reply = `Next: What’s your cost for: ${expenseLabels[index + 1]}?`;
+        await safeReply(
+          `Next: What’s your cost for: ${expenseLabels[index + 1]}?`
+        );
       } else {
         await updateSessionStep(phoneNumber, "show_summary");
-        reply = `Thanks! Generating your budget summary...`;
+        //await safeReply(`Thanks! Generating your budget summary...`);
 
         // Optionally call summary generator here
         const summary = generateSummary.generateSummary(session);
@@ -309,24 +340,28 @@ const startSession = async (req, res) => {
 
         await updateSessionField(phoneNumber, "completed", true);
 
-        reply = `${summary.summaryText}
+        await safeReply(
+          `Thanks! Generating your budget summary...\n\n
+          ${summary.summaryText}
             🤖 *Insight from Budget booking assistant:*
             ${aiInsight}
 
             🔁 *Would you like to do any of the following?*
             - Type *restart* to start over
-            - Type *pdf* to download your budget summary as a PDF
-             `.trim();
+            - Type *pdf* to download your budget summary as a PDF or excel to download as an Excel sheet.`.trim()
+        );
       }
       break;
     }
     default:
-      reply = `🤖 I didn’t quite understand that. Type *restart* to begin again.`;
+      await safeReply(
+        `🤖 I didn’t quite understand that. Type *restart* to begin again.`
+      );
   }
 
   //await updateSessionStep(phoneNumber, getNextStep(currentStep));
   // Send response to user via Meta API
-  sendReply(phoneNumber, reply, res);
+  //   sendReply(phoneNumber, reply, res);
 };
 
 const sendReply = async (phoneNumber, reply, res) => {
@@ -344,8 +379,6 @@ const sendReply = async (phoneNumber, reply, res) => {
       },
     }
   );
-
-  res.sendStatus(200);
 };
 
 const verifyToken = (req, res) => {
