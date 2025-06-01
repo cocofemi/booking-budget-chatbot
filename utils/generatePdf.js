@@ -42,6 +42,7 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     y = addField("Name", session.name, y);
     y = addField("Artist", session.artist, y);
     y = addField("Location", `${session.venue}, ${session.location}`, y);
+    y = addField("Capacity", session.capacity || "N/A", y);
     y = addField("Date", session.date, y);
     y = addField("Currency", session.currency, y);
     y += 20;

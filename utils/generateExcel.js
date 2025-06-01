@@ -26,6 +26,10 @@ async function generateExcel(session) {
     value: session.location,
   });
   sheet.addRow({
+    label: "Capacity",
+    value: session.capacity || "N/A",
+  });
+  sheet.addRow({
     value: "Date",
     value: session.date,
   });
