@@ -399,22 +399,22 @@ const startSession = async (req, res) => {
   //   sendReply(phoneNumber, reply, res);
 };
 
-const sendReply = async (phoneNumber, reply, res) => {
-  await axios.post(
-    `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/messages`,
-    {
-      messaging_product: "whatsapp",
-      to: phoneNumber,
-      text: { body: reply },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-};
+// const sendReply = async (phoneNumber, reply, res) => {
+//   await axios.post(
+//     `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/messages`,
+//     {
+//       messaging_product: "whatsapp",
+//       to: phoneNumber,
+//       text: { body: reply },
+//     },
+//     {
+//       headers: {
+//         Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+//         "Content-Type": "application/json",
+//       },
+//     }
+//   );
+// };
 
 const verifyToken = (req, res) => {
   const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
