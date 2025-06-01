@@ -48,7 +48,7 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     y += 20;
 
     // === Ticket Info Section ===
-    y = drawSectionHeader("Ticket Information", y, "#8bc34a");
+    y = drawSectionHeader("Ticket Information", y, "#2196f3");
     y = addField("Tickets Tiers", session.ticketCount || 0, y);
     session.tickets?.forEach((ticket) => {
       doc
@@ -72,7 +72,7 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     y += 20;
 
     // === Summary Section ===
-    y = drawSectionHeader("Budget Summary", y, "#e91e63");
+    y = drawSectionHeader("Budget Summary", y, "#ffc107");
     y = addField(
       "Gross Revenue",
       formatCurrency(session.summary?.grossRevenue, session.currency),
@@ -91,12 +91,12 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     y += 20;
 
     // === Expense List ===
-    y = drawSectionHeader("All Expenses", y, "#ffc107");
+    y = drawSectionHeader("All Expenses", y, "#e91e63");
     session.expenses?.forEach((expense) => {
       if (y > 720) {
         doc.addPage();
         y = 50; // reset margin
-        y = drawSectionHeader("AllExpenses (cont.)", y, "#ffc107");
+        y = drawSectionHeader("AllExpenses (cont.)", y, "#e91e63");
       }
       doc
         .font("Helvetica")
@@ -113,13 +113,13 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     y += 20;
 
     // === Top 3 Expenses ===
-    y = drawSectionHeader("Top 3 Expenses", y, "#2196f3");
+    y = drawSectionHeader("Top 3 Expenses", y, "#e91e63");
     session.summary?.topExpenses?.forEach((item) => {
       // Add page if we're close to bottom
       if (y > 720) {
         doc.addPage();
         y = 50; // reset margin
-        y = drawSectionHeader("Top 3 Expenses (cont.)", y, "#2196f3");
+        y = drawSectionHeader("Top 3 Expenses (cont.)", y, "#e91e63");
       }
 
       doc.font("Helvetica").text(`- ${item}`, 60, y);
