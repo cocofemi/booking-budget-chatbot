@@ -16,6 +16,8 @@ const fs = require("fs");
 const FormData = require("form-data");
 const generateExcel = require("../utils/generateExcel");
 const sendDocument = require("../utils/sendDocument");
+const { makeSafeReply } = require("../utils/replyHandler");
+const uploadFileToCloudinary = require("../utils/uploadFile");
 
 const STATES = [
   "welcome_message",
@@ -35,33 +37,43 @@ const STATES = [
   "show_summary",
 ];
 
-const getNextStep = (currentStep) => {
-  const index = STATES.indexOf(currentStep);
-  return index < STATES.length - 1 ? STATES[index + 1] : "show_summary";
-};
+// const getNextStep = (currentStep) => {
+//   const index = STATES.indexOf(currentStep);
+//   return index < STATES.length - 1 ? STATES[index + 1] : "show_summary";
+// };
 
 const startSession = async (req, res) => {
+  const isClient = req.query.source === "client"; // or use req.headers.source
   const entry = req.body.entry?.[0];
   const message = entry?.changes?.[0]?.value?.messages?.[0];
-  const phoneNumber = message?.from;
-  const text = message?.text?.body;
+  const phoneNumber = isClient ? req.body.sessionId : message?.from;
+  const text = isClient ? req.body.text : message?.text?.body;
 
-  if (!message || !phoneNumber) {
-    return res.sendStatus(200); // skip if not a message
-  }
+  console.log(req.body);
+
+  //   if (!message || !phoneNumber) {
+  //     return res.sendStatus(200); // skip if not a message
+  //   }
 
   const session = await findOrCreateSession(phoneNumber);
+
+  // Skip welcome_message for client
+  if (isClient && session.currentStep === "welcome_message") {
+    await updateSessionStep(phoneNumber, "ask_name");
+    session.currentStep = "ask_name"; // so switch() enters correct case
+  }
   const currentStep = session.currentStep;
 
-  let hasResponded = false;
+  //   let hasResponded = false;
 
-  const safeReply = async (msg) => {
-    if (!hasResponded) {
-      await sendReply(phoneNumber, msg);
-      res.sendStatus(200);
-      hasResponded = true;
-    }
-  };
+  //   const safeReply = async (msg) => {
+  //     if (!hasResponded) {
+  //       await sendReply(phoneNumber, msg);
+  //       res.sendStatus(200);
+  //       hasResponded = true;
+  //     }
+  //   };
+  const safeReply = makeSafeReply(res, isClient, phoneNumber);
 
   let reply = "";
   const lowerText = text.trim().toLowerCase();
@@ -96,35 +108,58 @@ const startSession = async (req, res) => {
       safeReply(
         `📄 You can only request a PDF after completing the budget session. Type *restart* to begin.`
       );
-      return await sendReply(phoneNumber, reply, res);
+      //   return await sendReply(phoneNumber, reply, res);
     }
-
-    await updateSessionField(phoneNumber, "formatChoice", lowerText);
-
     try {
+      await updateSessionField(phoneNumber, "formatChoice", lowerText);
       //   await safeReply(
       //     `✅ Give me one second while I generate your budget summary PDF...`
       //   );
       //   reply = `✅ Give me one second while I generate your budget summary PDF...`;
       //   await sendReply(phoneNumber, reply, res);
       if (lowerText === "pdf") {
-        await safeReply("✅ Generating your PDF...");
+        // await safeReply("✅ Generating your PDF...");
         const pdfPath = await generatePdf(session);
-        await sendDocument(pdfPath, phoneNumber, "event-budget-summary.pdf");
 
-        await sendReply(
-          phoneNumber,
-          `✅ Done! Want this in Excel instead? Type *excel* to get a spreadsheet.\nOr type *restart* to begin a new session.`
-        );
+        const fileUrl = await uploadFileToCloudinary(pdfPath, `${phoneNumber}`);
+
+        if (isClient) {
+          console.log("does this work");
+          return await safeReply({
+            reply: `✅ Generating your PDF...\n\n✅ Done! Want this in Excel instead? Type *excel* to get a spreadsheet.\nOr type *restart* to begin a new session.`,
+            fileUrl,
+            fileType: "pdf",
+          });
+        }
+
+        await sendDocument(pdfPath, phoneNumber, "event-budget-summary.pdf");
+        // await sendReply(
+        //   phoneNumber,
+        //   `✅ Done! Want this in Excel instead? Type *excel* to get a spreadsheet.\nOr type *restart* to begin a new session.`
+        // );
       } else {
-        await safeReply("✅ Generating your Excel sheet...");
+        // await safeReply("✅ Generating your Excel sheet...");
         const excelPath = await generateExcel(session); // You’ll build this
+
+        const fileUrl = await uploadFileToCloudinary(
+          excelPath,
+          `session_${phoneNumber}`
+        );
+
+        if (isClient) {
+          return await safeReply({
+            reply: `✅ Generating your Excel sheet...\n\n✅ Done! Want a PDF version instead? Type *pdf* to get one.\nOr type *restart* to start fresh.`,
+            fileUrl,
+            fileType: "xlsx",
+          });
+        }
+
         await sendDocument(excelPath, phoneNumber, "event-budget-summary.xlsx");
 
-        await sendReply(
-          phoneNumber,
-          `✅ Done! Want a PDF version instead? Type *pdf* to get one.\nOr type *restart* to start fresh.`
-        );
+        // await sendReply(
+        //   phoneNumber,
+        //   `✅ Done! Want a PDF version instead? Type *pdf* to get one.\nOr type *restart* to start fresh.`
+        // );
       }
     } catch (error) {
       console.error("Error generating PDF:", error);
