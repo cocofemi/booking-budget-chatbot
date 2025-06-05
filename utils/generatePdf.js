@@ -75,17 +75,17 @@ function generatePdf(session, filename = "budget-summary.pdf") {
     y = drawSectionHeader("Budget Summary", y, "#ffc107");
     y = addField(
       "Gross Revenue",
-      formatCurrency(session.summary?.grossRevenue, session.currency),
+      formatCurrency(Number(session.summary?.grossRevenue), session.currency),
       y
     );
     y = addField(
       "Total Expenses",
-      formatCurrency(session.summary?.totalExpenses, session.currency),
+      formatCurrency(Number(session.summary?.totalExpenses), session.currency),
       y
     );
     y = addField(
       "Net Profit",
-      formatCurrency(session.summary?.netProfit, session.currency),
+      formatCurrency(Number(session.summary?.netProfit), session.currency),
       y
     );
     y += 20;
