@@ -111,10 +111,10 @@ const startSession = async (req, res) => {
 
     case "end_conversation":
       await updateSessionField(sessionId, "promoterInformation", text);
-      await updateSessionField(2348110612959, "completed", true);
+      await updateSessionField(sessionId, "completed", true);
       const sessionUpdate = await findOrCreateSession(sessionId);
       const bookingSummary = await generateBookingSummary(sessionUpdate);
-      await sendWhatsAppReply(2348110612959, bookingSummary);
+      await sendWhatsAppReply(process.env.phoneNumber, bookingSummary);
 
       await safeReply(`Thanks for your enquiry we would be in touch soon.\n
           As you are aware, there are many details that go into booking an artist so please understand that this booking form serves as an invitation only. \n
