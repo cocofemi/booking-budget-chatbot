@@ -45,7 +45,7 @@ const newSessionBudget = async (req, res) => {
     const session = await findOrCreateSession(sessionId);
 
     const summary = generateSummary.generateSummary(session);
-    // const aiInsight = await generateContextNote.generateContextNote(summary);
+    const aiInsight = await generateContextNote.generateContextNote(summary);
 
     await updateSessionField(sessionId, "summary", {
       grossRevenue: summary.grossRevenue,
