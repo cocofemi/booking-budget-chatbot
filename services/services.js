@@ -9,9 +9,26 @@ const findOrCreateSession = async (sessionId) => {
   return session;
 };
 
+const findOrCreateBudget = async (sessionId) => {
+  let session = await Session.findOne({ sessionId });
+  if (!session) {
+    session = await Session.create({ sessionId });
+  }
+  return session;
+};
+
 const updateSessionField = async (sessionId, field, value) => {
   const update = { [field]: value, lastUpdated: new Date() };
   return await Booking.findOneAndUpdate(
+    { sessionId },
+    { $set: update },
+    { new: true }
+  );
+};
+
+const updateBudgetField = async (sessionId, field, value) => {
+  const update = { [field]: value, lastUpdated: new Date() };
+  return await Session.findOneAndUpdate(
     { sessionId },
     { $set: update },
     { new: true }
@@ -44,7 +61,9 @@ const updateSessionStep = async (sessionId, newStep) => {
 
 module.exports = {
   findOrCreateSession,
+  findOrCreateBudget,
   updateSessionField,
+  updateBudgetField,
   addTicket,
   addExpense,
   updateSessionStep,

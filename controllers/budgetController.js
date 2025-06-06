@@ -5,8 +5,8 @@ const generatePdf = require("../utils/generatePdf");
 const generateExcel = require("../utils/generateExcel");
 const uploadFileToCloudinary = require("../utils/uploadFile");
 const {
-  findOrCreateSession,
-  updateSessionField,
+  findOrCreateBudget,
+  updateBudgetField,
 } = require("../services/services");
 
 const newSessionBudget = async (req, res) => {
@@ -26,7 +26,7 @@ const newSessionBudget = async (req, res) => {
 
   try {
     const newBudget = new Session({
-      phoneNumber: sessionId,
+      sessionId,
       name,
       email,
       artist,
@@ -42,12 +42,12 @@ const newSessionBudget = async (req, res) => {
 
     await newBudget.save();
 
-    const session = await findOrCreateSession(sessionId);
+    const session = await findOrCreateBudget(sessionId);
 
     const summary = generateSummary.generateSummary(session);
     const aiInsight = await generateContextNote.generateContextNote(summary);
 
-    await updateSessionField(sessionId, "summary", {
+    await updateBudgetField(sessionId, "summary", {
       grossRevenue: summary.grossRevenue,
       totalExpenses: summary.totalExpenses,
       netProfit: summary.netProfit,
@@ -55,7 +55,7 @@ const newSessionBudget = async (req, res) => {
       aiInsight,
     });
 
-    const updatedSession = await findOrCreateSession(sessionId);
+    const updatedSession = await findOrCreateBudget(sessionId);
 
     // Generate and upload files
     const [pdfPath, excelPath] = await Promise.all([

@@ -12,8 +12,7 @@ const ExpenseSchema = new mongoose.Schema({
 });
 
 const SessionSchema = new mongoose.Schema({
-  phoneNumber: { type: String, required: true, unique: true },
-  currentStep: { type: String, default: "welcome_message" },
+  sessionId: { type: String, required: true, unique: true },
   name: String,
   email: String,
   artist: String,
@@ -25,9 +24,6 @@ const SessionSchema = new mongoose.Schema({
   ticketCount: Number,
   tickets: [TicketSchema],
   expenses: [ExpenseSchema],
-  currentTicketIndex: { type: Number, default: 0 },
-  currentExpenseIndex: { type: Number, default: 0 },
-  formatChoice: { type: String, enum: ["pdf", "excel"], default: "pdf" },
   summary: {
     grossRevenue: Number,
     totalExpenses: Number,
@@ -35,7 +31,6 @@ const SessionSchema = new mongoose.Schema({
     topExpenses: [String],
     aiInsight: String,
   },
-  completed: { type: Boolean, default: false },
 
   lastUpdated: { type: Date, default: Date.now },
 });
