@@ -78,11 +78,11 @@ const startSession = async (req, res) => {
       await updateSessionStep(sessionId, "ask_show_terms");
       await safeReply(`Awesome! \n
            Let's move on to specific information regarding the show \n           
-           Who is the proposed headline/second/opener sponsors would be ?\n
-           When the doors of the show would be open? \n
+           Who are the proposed headline/second/opener sponsors? ?\n
+           When would the doors of the show would be open? \n
            What time you would like ${session?.artist} to performance \n
            What are the ages of attendees to this show? \n
-           If any other acts are scheduled to perform what are their name? \n
+           If any other acts are scheduled to perform what are their names? \n
            (i.e We have xyz as our headline sponsor, doors open at 12,
            artist perform at 3pm, attendees 18-45, other acts to be announced )? \n `);
       break;
